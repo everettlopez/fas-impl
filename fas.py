@@ -1,6 +1,6 @@
 ############################################################
 #### Description:
-# Our implementation of Schnorr Adaptor Signatures. 
+# Our implementation of Functional Adaptor Signatures. 
 ############################################################
 
 import random
