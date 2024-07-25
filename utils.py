@@ -134,6 +134,31 @@ def point_mul(P: Optional[Point], n: int) -> Optional[Point]:
         # this is still very slow if input n is uniformly random
         return group_ops.point_mul(P, n)
 
+# implements FastMult algorithm from Section 3.2 of https://cseweb.ucsd.edu/~mihir/papers/batch.pdf
+## This is tested in ipfe.py in the method ipfe_pubkgen_sequential_fast and turns out this is slower than
+## multiplying manually. TODO: Why? 
+def point_batch_mul(count: int, P_dict: dict, n_dict: dict) -> Optional[Point]:
+    val = group_ops.point_mul(G, 0)
+    # print('point_batch_mul: starting val = {}'.format(val))
+    Points_dict = {}
+    for i in range(count):
+        Points_dict[i] = point_from_bytes(P_dict[i])
+        # print('Points_dict[{}] = {}'.format(i, Points_dict[i]))
+
+    for j in reversed(range(256)):
+        # print('point_batch_mul: outer loop squaring val = {}'.format(val))
+        val = group_ops.point_add(val, val)
+        # print('point_batch_mul: outer loop result   val = {}'.format(val))
+        for i in range(count):
+            if ((n_dict[i] >> j) & 1):
+                # print('point_batch_mul: j = {}, n_dict[{}] = {}'.format(j, i, n_dict[i]))
+                # print('point_batch_mul: Adding val = {} and Points_dict[{}] = {}'.format(val, i, Points_dict[i]))
+                val = group_ops.point_add(val, Points_dict[i])
+                # print('point_batch_mul: Add result val = {}'.format(val))
+    
+    # print('point_batch_mul: final val = {}'.format(val))
+    return val
+
 def bytes_from_int(x: int) -> bytes:
     return x.to_bytes(32, byteorder="big")
 

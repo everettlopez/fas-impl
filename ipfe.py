@@ -70,6 +70,84 @@ def ipfe_pubkgen(ipfelen: int, mpk: dict, f: dict) -> bytes:
     debug_print_vars(settings.DEBUG)
     return bytes_from_point(pk_f)
 
+def ipfe_pubkgen_sequential(ipfelen: int, mpk: dict, f: dict) -> bytes:
+    # print("PubKGen: check1")
+    if len(mpk) != ipfelen:
+        raise ValueError('ipfe_kgen: The mpk must be list of length: {}'.format(ipfelen))
+    if len(f) != ipfelen:
+        raise ValueError('ipfe_kgen: The function must be list of length: {}'.format(ipfelen))
+
+    # # num CPUs 
+    # cpu_num = os.cpu_count()
+    # # print("PubKGen: check2: cpu_num: {}".format(cpu_num))
+    # with concurrent.futures.ProcessPoolExecutor(max_workers = 1, mp_context=mp.get_context('spawn'), max_tasks_per_child = ipfelen) as executor:
+    #     pk_intermediates = list(executor.map(point_mul, 
+    #         (point_from_bytes(mpk[i]) for i in range(ipfelen)),
+    #         (f[i] for i in range(ipfelen)),
+    #         ))
+    # # print("PubKGen: check3")
+
+    # pk_intermediates = []
+    # for i in range(ipfelen):
+    #     pk_intermediates.extend(point_mul(point_from_bytes(mpk[i]), f[i]))
+    # # print(type(Point(pk_intermediates[0])))
+
+    pk_f = point_mul(G, 0)
+    # print("PubKGen: check4")
+
+    for i in range(ipfelen):
+        # print('index: {}'.format(i))
+        # pk_f = point_add(pk_f, pk_intermediates[i])
+        pk_f = point_add(pk_f, point_mul(point_from_bytes(mpk[i]), f[i]))
+    # print("PubKGen: check5")
+
+    debug_print_vars(settings.DEBUG)
+    return bytes_from_point(pk_f)
+
+## this turns out to be actually slower than ipfe_pubkgen_sequential and ipfe_pubkgen. Why?
+def ipfe_pubkgen_sequential_fast(ipfelen: int, mpk: dict, f: dict) -> bytes:
+    # print("PubKGen: check1")
+    if len(mpk) != ipfelen:
+        raise ValueError('ipfe_kgen: The mpk must be list of length: {}'.format(ipfelen))
+    if len(f) != ipfelen:
+        raise ValueError('ipfe_kgen: The function must be list of length: {}'.format(ipfelen))
+
+    # print('mpk: {}'.format(mpk))
+    # print('f: {}'.format(f))
+    pk_f = point_batch_mul(ipfelen, mpk, f)
+
+    debug_print_vars(settings.DEBUG)
+    return bytes_from_point(pk_f)
+
+## this turns out to be actually slower than ipfe_pubkgen_sequential_fast, ipfe_pubkgen_sequential and ipfe_pubkgen. Why?
+def ipfe_pubkgen_fast(ipfelen: int, mpk: dict, f: dict) -> bytes:
+    # print("PubKGen: check1")
+    if len(mpk) != ipfelen:
+        raise ValueError('ipfe_kgen: The mpk must be list of length: {}'.format(ipfelen))
+    if len(f) != ipfelen:
+        raise ValueError('ipfe_kgen: The function must be list of length: {}'.format(ipfelen))
+
+    # num CPUs 
+    cpu_num = os.cpu_count()
+    # print("PubKGen: check2: cpu_num: {}".format(cpu_num))
+    with concurrent.futures.ProcessPoolExecutor(max_workers = cpu_num, mp_context=mp.get_context('spawn'), max_tasks_per_child = ipfelen) as executor:
+        pk_intermediates = list(executor.map(point_batch_mul, 
+            (1 for i in range(ipfelen)),
+            ({0: mpk[i]} for i in range(ipfelen)),
+            ({0: f[i]} for i in range(ipfelen)),
+            ))
+    # print("PubKGen: check3")
+
+    pk_f = point_mul(G, 0)
+    # print("PubKGen: check4")
+
+    for i in range(ipfelen):
+        pk_f = point_add(pk_f, pk_intermediates[i])
+    # print("PubKGen: check5")
+
+    debug_print_vars(settings.DEBUG)
+    return bytes_from_point(pk_f)
+
 # def ipfe_dec(ipfelen: int, mpk: list[bytes], f: list[int], sk_f: int, ct0: bytes, ct1: list[bytes], bound: int, msg_dict: dict) -> int:
 def ipfe_dec(ipfelen: int, f: dict, sk_f: int, ct0: bytes, ct1: dict, bound: int) -> int:
     ct2 = ipfe_dec_offline(ipfelen, f, ct1)
@@ -112,7 +190,8 @@ def ipfe_dec_online(sk_f: int, ct0: bytes, ct2: bytes, bound: int) -> int:
 if __name__ == '__main__':
     settings.init()
 
-    len_range = (10 ** 2, 10 ** 3, 10 ** 4)
+    # len_range = (1, 2, 10)
+    len_range = (10 ** 2, 10 ** 3, 10 ** 4, 10 ** 5)
     # bound_range = (100, 10000)
     msg_bound = 1000
     f_bound = 1000
@@ -168,6 +247,9 @@ if __name__ == '__main__':
                 try: 
                     pubkgen_st = time.time()
                     pk_f = ipfe_pubkgen(ipfelen, mpk, f)
+                    # pk_f = ipfe_pubkgen_sequential(ipfelen, mpk, f)
+                    # pk_f = ipfe_pubkgen_sequential_fast(ipfelen, mpk, f)
+                    # pk_f = ipfe_pubkgen_fast(ipfelen, mpk, f)
                     pubkgen_et = time.time()
                     pubkgen_time = pubkgen_et - pubkgen_st
 
