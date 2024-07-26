@@ -75,6 +75,22 @@ def point_mul(P: Optional[Point], n: int) -> Optional[Point]:
     else:
         return c.power(P, n)
 
+def point_mul_slow(P: Optional[Point], n: int) -> Optional[Point]:
+    if USE_FAST_SECP256K1_LIB:
+        P_Pt = fast_secp256k1.Point(x(P), y(P))
+        res_Pt = P_Pt.multiply_slow(n)
+        return (res_Pt.x, res_Pt.y)
+
+def point_batch_mul(count: int, Points_dict: dict, n_dict: dict) -> Optional[Point]:
+    if USE_FAST_SECP256K1_LIB:
+        # zero_Pt = fast_secp256k1.Point(0, 0)
+        zero_Pt = fast_secp256k1.Point.zero()
+        fast_P_dict = {}
+        for i in range(count):
+            fast_P_dict[i] = fast_secp256k1.Point(x(Points_dict[i]), y(Points_dict[i]))
+        res_Pt = zero_Pt.batch_multiply(count, fast_P_dict, n_dict)
+        return (res_Pt.x, res_Pt.y)        
+
 #### check if point is on curve
 def is_point_on_curve(P: Point) -> bool:
     return c.check(P)

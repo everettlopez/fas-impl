@@ -50,6 +50,26 @@ def pke_setup(pkelen: int) -> (dict, dict):
     debug_print_vars(settings.DEBUG)
     return (pubkey, seckey)
 
+## outputs seckey such that its each co-ordinate is same 
+## outputs pubkey such that its each co-ordinate is same 
+def pke_setup_dummy(pkelen: int) -> (dict, dict):
+    seckey = {}
+    pubkey = {}
+    fixed_seckey = bytes_from_int(random.randint(1,n-1))
+    fixed_pubkey = pubkey_gen(fixed_seckey)
+
+    for i in range(pkelen):
+        seckey[i] = fixed_seckey
+
+    for i in range(pkelen):
+        pubkey[i] = fixed_pubkey
+
+    # print("sk time: {}, pk time: {}, parallel pk time: {}".format(sk_time, pk_time, parallel_time))
+    # if pubkey != pubkey_new:
+    #     print("PARALLEL FAILURE: pke setup")
+    debug_print_vars(settings.DEBUG)
+    return (pubkey, seckey)
+
 
 def pke_setup_sequential(pkelen: int) -> (dict, dict):
     seckey = {}
@@ -96,7 +116,7 @@ def pke_encrypt(pkelen: int, pubkey: dict, msg: dict) -> (bytes, dict):
     cpu_num = os.cpu_count()
     # print("PKE.Enc: check2: cpu_num: {}".format(cpu_num))
     # print("Number of CPUs available: {}".format(cpu_num))
-    parallel_st = time.time()
+    # parallel_st = time.time()
     with concurrent.futures.ProcessPoolExecutor(max_workers = cpu_num, mp_context=mp.get_context('spawn'), max_tasks_per_child = pkelen) as executor:
         ct1_list = list(executor.map(pke_encrypt_helper, 
             (i for i in range(pkelen)), 
@@ -107,13 +127,34 @@ def pke_encrypt(pkelen: int, pubkey: dict, msg: dict) -> (bytes, dict):
     ct1 = {}
     for i in range(pkelen):
         ct1[i] = ct1_list[i]
-    parallel_et = time.time()
-    parallel_time = parallel_et - parallel_st
+    # parallel_et = time.time()
+    # parallel_time = parallel_et - parallel_st
     # print("parallel enc time using map: {}".format(parallel_time))
 
 
     debug_print_vars(settings.DEBUG)
     return (ct0, ct1)
+
+## Assumes each co-ordinate of pubkey is same 
+## Assumes each co-ordinate of msg is same 
+def pke_encrypt_dummy(pkelen: int, pubkey: dict, msg: dict) -> (bytes, dict):
+    if len(pubkey) != pkelen:
+        raise ValueError('pke_encrypt: The public key must be list of length: {}'.format(pkelen))
+    if len(msg) != pkelen:
+        # maybe append with zeros instead of raising error?
+        raise ValueError('pke_encrypt: The message must be list of length: {}'.format(pkelen))
+
+    r = random.randint(1, n-1)
+    ct0 = bytes_from_point(point_mul(G, r))
+        
+    ct1 = {}
+    dummy_ct1 = pke_encrypt_helper(0, pubkey[0], msg[0], r)
+    for i in range(pkelen):
+        ct1[i] = dummy_ct1
+
+    debug_print_vars(settings.DEBUG)
+    return (ct0, ct1)
+
 
 def pke_encrypt_sequential(pkelen: int, pubkey: dict, msg: dict) -> (bytes, dict):
     if len(pubkey) != pkelen:

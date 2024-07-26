@@ -107,6 +107,65 @@ class JacobianPoint(object):
         k2p = JacobianPoint(mod(k2p.x * BETA), k2p.y, k2p.z)
         return k1p.add(k2p)
 
+    # without using endomorphism
+    def multiply_unsafe_slow(self, n):
+        p = JacobianPoint.zero()
+        d = self
+        while n > 0:
+            if n & 1:
+                p = p.add(d)
+            d = d.double()
+            n >>= 1
+        return p
+
+    ### Note: I do not know if there is a way to fasten up batch_multiply_unsafe using endomorphisms.
+    ### The main challenge seems that if in multiply_unsafe k1neg and k2neg are used to 
+    ### conditionally negate k1p and k2p, but due to the batch setting, now we have k1neg[i] and k2neg[i] for all i in count.
+    ### how to do conditional negations then? 
+    ### If there was a way to ensure that k1[i] and k2[i] are never negative, 
+    ### then maybe it's possible to use endomorphisms to speed up batch multiplications.
+    # def batch_multiply_unsafe_fast(self, count, Jacobian_Points_dict, n_dict):
+    #     p1 = self
+    #     p2 = self
+    #     k1neg = {}
+    #     k1 = {}
+    #     k2neg = {}
+    #     k2 = {}
+    #     for i in range(count):
+    #         (k1neg[i], k1[i], k2neg[i], k2[i]) = split_scalar_endo(n_dict[i])
+
+    #     # for i in range(count):
+    #         # print('batch_multiply_unsafe_slow: n_dict[{}] = {}'.format(i, n_dict[i]))
+    #     for j in reversed(range(256)):
+    #         p1 = p1.double()
+    #         p2 = p2.double()
+    #         for i in range(count):                
+    #             if ((k1[i] >> j) & 1):
+    #                 # print('batch_multiply_unsafe_slow: index j = {} added'.format(j))
+    #                 p1 = p1.add(Jacobian_Points_dict[i])
+    #             if ((k2[i] >> j) & 1):
+    #                 # print('batch_multiply_unsafe_slow: index j = {} added'.format(j))
+    #                 p2 = p2.add(Jacobian_Points_dict[i])
+
+    #             # else:
+    #                 # print('batch_multiply_unsafe_slow: index j = {} NOT added'.format(j))
+    #     return p
+
+    # 
+    def batch_multiply_unsafe(self, count, Jacobian_Points_dict, n_dict):
+        p = self
+        # for i in range(count):
+            # print('batch_multiply_unsafe_slow: n_dict[{}] = {}'.format(i, n_dict[i]))
+        for j in reversed(range(256)):
+            p = p.double()
+            for i in range(count):                
+                if ((n_dict[i] >> j) & 1):
+                    # print('batch_multiply_unsafe_slow: index j = {} added'.format(j))
+                    p = p.add(Jacobian_Points_dict[i])
+                # else:
+                    # print('batch_multiply_unsafe_slow: index j = {} NOT added'.format(j))
+        return p
+
 
 class Point(object):
     def __init__(self, x, y):
@@ -124,6 +183,21 @@ class Point(object):
 
     def multiply(self, scalar):
         return JacobianPoint.from_affine(self).multiply_unsafe(scalar).to_affine()
+
+    def multiply_slow(self, scalar):
+        return JacobianPoint.from_affine(self).multiply_unsafe_slow(scalar).to_affine()
+
+    # def batch_multiply_fast(self, count, Points_dict, scalars_dict):
+    #     Jacobian_Points_dict = {}
+    #     for i in range(count):
+    #         Jacobian_Points_dict[i] = JacobianPoint.from_affine(Points_dict[i])
+    #     return JacobianPoint.from_affine(self).batch_multiply_unsafe_fast(count, Jacobian_Points_dict, scalars_dict).to_affine()
+
+    def batch_multiply(self, count, Points_dict, scalars_dict):
+        Jacobian_Points_dict = {}
+        for i in range(count):
+            Jacobian_Points_dict[i] = JacobianPoint.from_affine(Points_dict[i])
+        return JacobianPoint.from_affine(self).batch_multiply_unsafe(count, Jacobian_Points_dict, scalars_dict).to_affine()
 
 
 def mod(a, b=P):
@@ -180,6 +254,7 @@ def main():
     print(f"{point.x:x},{point.y:x}")
 
     ops_test = True
+    batch_test = True
 
     if ops_test:
         r1 = random.randint(1, N-1)
@@ -190,7 +265,14 @@ def main():
         r1p = G.multiply(r1)
         et = time.time()
         testtime = et - st
-        print("Time for point_mul(G, r1) : {}".format(testtime))
+        print("Time for multiply(G, r1) : {}".format(testtime))
+
+        G = Point.base()
+        st = time.time()
+        r1p_slow = G.multiply_slow(r1)
+        et = time.time()
+        testtime = et - st
+        print("Time for multiply_slow(G, r1) : {}".format(testtime))
 
         r2p = G.multiply(r2)
 
@@ -198,21 +280,58 @@ def main():
         r3p = r1p.add(r1p)
         et = time.time()
         testtime = et - st
-        print("Time for point_add(r1, r1): {}".format(testtime))
+        print("Time for add(r1, r1): {}".format(testtime))
 
         st = time.time()
         r4p = r1p.add(r2p)
         et = time.time()
         testtime = et - st
-        print("Time for point_add(r1, r2): {}".format(testtime))
+        print("Time for add(r1, r2): {}".format(testtime))
 
         st = time.time()
         r5p = r1p.multiply(r2)
         et = time.time()
         testtime = et - st
-        print("Time for point_mul(R, r2) : {}".format(testtime))
+        print("Time for multiply(R, r2) : {}".format(testtime))
 
+        st = time.time()
+        r5p = r1p.multiply_slow(r2)
+        et = time.time()
+        testtime = et - st
+        print("Time for multiply_slow(R, r2) : {}".format(testtime))
 
+    if batch_test:
+        batch_size = 1
+        Points_dict = {}
+        n_dict = {}
+        # local_N = N
+        local_N = 4
+        for i in range(batch_size):
+            G = Point.base()
+            Points_dict[i] = G.multiply(random.randint(1, local_N-1))
+            print('Points_dict[{}] = {}'.format(i, Points_dict[i]))
+            n_dict[i] = random.randint(1, local_N-1)
+            print('n_dict[{}] = {}'.format(i, n_dict[i]))
+        zero = Point.zero()
+
+        st = time.time()
+        batch_val = zero.batch_multiply_slow(batch_size, Points_dict, n_dict)
+        et = time.time()
+        testtime = et - st
+        print("Time for batch_multiply_slow(batch_size = {}, ...) : {}".format(batch_size, testtime))
+
+        st = time.time()
+        sequential_val = Point.zero()
+        for i in range(batch_size):
+            sequential_val = sequential_val.add(Points_dict[i].multiply_slow(n_dict[i]))
+        et = time.time()
+        testtime = et - st
+        print("Time for {} number of multiply_slow : {}".format(batch_size, testtime))
+
+        if sequential_val != batch_val:
+            print('ERROR: sequential_val != batch_val')
+        else:
+            print('SUCCESS: sequential_val = batch_val')
 
 if __name__ == '__main__':
     main()

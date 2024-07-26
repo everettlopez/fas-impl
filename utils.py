@@ -134,30 +134,36 @@ def point_mul(P: Optional[Point], n: int) -> Optional[Point]:
         # this is still very slow if input n is uniformly random
         return group_ops.point_mul(P, n)
 
+def point_mul_slow(P: Optional[Point], n: int) -> Optional[Point]:
+    return group_ops.point_mul_slow(P, n)
+
 # implements FastMult algorithm from Section 3.2 of https://cseweb.ucsd.edu/~mihir/papers/batch.pdf
 ## This is tested in ipfe.py in the method ipfe_pubkgen_sequential_fast and turns out this is slower than
 ## multiplying manually. TODO: Why? 
 def point_batch_mul(count: int, P_dict: dict, n_dict: dict) -> Optional[Point]:
-    val = group_ops.point_mul(G, 0)
-    # print('point_batch_mul: starting val = {}'.format(val))
-    Points_dict = {}
-    for i in range(count):
-        Points_dict[i] = point_from_bytes(P_dict[i])
-        # print('Points_dict[{}] = {}'.format(i, Points_dict[i]))
+    MANUAL_GROUP_OPS = False
+    if MANUAL_GROUP_OPS:
+        val = group_ops.point_mul(G, 0)
+        # print('point_batch_mul: starting val = {}'.format(val))
 
-    for j in reversed(range(256)):
-        # print('point_batch_mul: outer loop squaring val = {}'.format(val))
-        val = group_ops.point_add(val, val)
-        # print('point_batch_mul: outer loop result   val = {}'.format(val))
-        for i in range(count):
-            if ((n_dict[i] >> j) & 1):
-                # print('point_batch_mul: j = {}, n_dict[{}] = {}'.format(j, i, n_dict[i]))
-                # print('point_batch_mul: Adding val = {} and Points_dict[{}] = {}'.format(val, i, Points_dict[i]))
-                val = group_ops.point_add(val, Points_dict[i])
-                # print('point_batch_mul: Add result val = {}'.format(val))
-    
-    # print('point_batch_mul: final val = {}'.format(val))
-    return val
+        for j in reversed(range(256)):
+            # print('point_batch_mul: outer loop squaring val = {}'.format(val))
+            val = group_ops.point_add(val, val)
+            # print('point_batch_mul: outer loop result   val = {}'.format(val))
+            for i in range(count):
+                if ((n_dict[i] >> j) & 1):
+                    # print('point_batch_mul: j = {}, n_dict[{}] = {}'.format(j, i, n_dict[i]))
+                    # print('point_batch_mul: Adding val = {} and Points_dict[{}] = {}'.format(val, i, Points_dict[i]))
+                    val = group_ops.point_add(val, P_dict[i])
+                    # print('point_batch_mul: Add result val = {}'.format(val))
+        
+        # print('point_batch_mul: final val = {}'.format(val))
+        return val
+    else:
+        # Points_dict = {}
+        # for i in range(count):
+        #     Points_dict[i] = point_from_bytes(P_dict[i])
+        return group_ops.point_batch_mul(count, P_dict, n_dict)
 
 def bytes_from_int(x: int) -> bytes:
     return x.to_bytes(32, byteorder="big")
@@ -318,13 +324,15 @@ def debug_print_vars(debug) -> None:
 
 if __name__ == '__main__':
 
-    # ops_test = True
-    ops_test = False
+    ops_test = True
+    # ops_test = False
 
     # save_msg_dict_offline = True
     save_msg_dict_offline = False
 
-    dlog_test = True
+    dlog_test = False
+
+    batch_test = True
 
     if save_msg_dict_offline:
         bound = 10000000
@@ -390,4 +398,41 @@ if __name__ == '__main__':
             if s != val:
                 print('Discrete Log test FAILED: expected_val: {}, computed_val: {}'.format(s, val))
 
+    if batch_test:
+        batch_size = 10000
+        Points_dict = {}
+        n_dict = {}
+        # local_N = N
+        point_bound = 1000
+        scalar_bound = 1000
+        total_bound = batch_size * point_bound * scalar_bound
+        for i in range(batch_size):
+            exp = random.randint(1, point_bound-1)
+            Points_dict[i] = point_mul(G, exp)
+            # print('Points_dict[{}] = G^{}'.format(i, exp))
+            n_dict[i] = random.randint(1, scalar_bound-1)
+            # print('n_dict[{}] = {}'.format(i, n_dict[i]))
+        # zero = point_mul(G, 0)
+
+        st = time.time()
+        batch_val = point_batch_mul(batch_size, Points_dict, n_dict)
+        et = time.time()
+        testtime = et - st
+        print("Time for point_batch_mul(batch_size = {}, ...) : {}".format(batch_size, testtime))
+
+        st = time.time()
+        sequential_val = point_mul(G, 0)
+        for i in range(batch_size):
+            sequential_val = point_add(sequential_val, point_mul(Points_dict[i], n_dict[i]))
+            # sequential_val = point_add(sequential_val, point_mul_slow(Points_dict[i], n_dict[i]))
+        et = time.time()
+        testtime = et - st
+        print("Time for {} number of multiply                 : {}".format(batch_size, testtime))
+
+        if sequential_val != batch_val:
+            batch_val_dlog = compute_discrete_log(batch_val, total_bound)
+            sequential_val_dlog = compute_discrete_log(sequential_val, total_bound)
+            print('ERROR: sequential_val (G^{}) != batch_val (G^{})'.format(sequential_val_dlog, batch_val_dlog))
+        else:
+            print('SUCCESS: sequential_val = batch_val')
 

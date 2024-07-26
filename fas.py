@@ -157,9 +157,12 @@ def fas_fext_online(advt: advertisement, pubkey: bytes, presig: bytes, sig: byte
 if __name__ == '__main__':
 	settings.init()
 
+	# len_range = []
+	# len_range.append(1000000)
 	len_range = (1, 100, 10000)
 	# len_range = (20000, 30000, 40000, 50000)
-	# len_range = (60000, 70000, 80000, 90000, 100000, 300000, 1000000, 30000000)
+	# len_range = (60000, 70000, 80000, 90000, 100000)
+	# len_range = (300000, 1000000, 30000000)
 	# len_range = []
 	# len_range.append(50000)
 	# len_range.append(60000)
@@ -168,12 +171,12 @@ if __name__ == '__main__':
 
 	# bound_range = (100, 10000)
 	
-	f_bound_range = (100, 1000)
-	wit_bound_range = (100, 1000)
-	# wit_bound_range = []
-	# wit_bound_range.append(1000)
-	# f_bound_range = []
-	# f_bound_range.append(1000)
+	# f_bound_range = (100, 1000)
+	# wit_bound_range = (100, 1000)
+	wit_bound_range = []
+	wit_bound_range.append(1000)
+	f_bound_range = []
+	f_bound_range.append(1000)
 
 	# msg_dict = {}
 	# dict_st = time.time()
