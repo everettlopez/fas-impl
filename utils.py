@@ -13,6 +13,7 @@ import concurrent.futures
 import multiprocessing
 import pickle
 from math import ceil, sqrt
+import sys
 
 import settings
 import group_ops
@@ -282,7 +283,6 @@ def compute_discrete_log(P: Optional[Point], bound: int) -> int:
     local_dict = {}
     tmp = point_mul(G, 0)
     local_dict[tmp] = 0
-    dict_st = time.time()
     for i in range(1, m+1):
         tmp = point_add(tmp, G)
         local_dict[tmp] = i
@@ -321,6 +321,11 @@ def debug_print_vars(debug) -> None:
 			if var_name == 'msg_dict':
 				continue
 			print('   ' + var_name.rjust(11, ' '), '==', pretty(var_val))
+
+def dict_kv_length(d):
+    klen = sum(sys.getsizeof(k) for k in d.keys())
+    vlen = sum(sys.getsizeof(v) for v in d.values())
+    return klen + vlen
 
 if __name__ == '__main__':
 

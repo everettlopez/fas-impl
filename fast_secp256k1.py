@@ -4,8 +4,11 @@
 # ported from 1.ts
 
 import sys
+import os
 import time 
 import random
+import concurrent.futures
+import multiprocessing as mp
 
 P = 2 ** 256 - 2 ** 32 - 977
 N = 2 ** 256 - 432420386565659656852420866394968145599
@@ -13,7 +16,6 @@ GX = 550662630222773436695787188951685343262506034537775941755001873603891167292
 GY = 32670510020758816978083085130507043184471273380659243275938904335757337482424
 BETA = 0x7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee
 POW_2_128 = 2 ** 128
-
 
 class JacobianPoint(object):
     def __init__(self, x, y, z):
@@ -151,7 +153,7 @@ class JacobianPoint(object):
     #                 # print('batch_multiply_unsafe_slow: index j = {} NOT added'.format(j))
     #     return p
 
-    # 
+
     def batch_multiply_unsafe(self, count, Jacobian_Points_dict, n_dict):
         p = self
         # for i in range(count):
@@ -166,6 +168,61 @@ class JacobianPoint(object):
                     # print('batch_multiply_unsafe_slow: index j = {} NOT added'.format(j))
         return p
 
+    def batch_multiply_parallel_unsafe(self, count, Jacobian_Points_dict, n_dict):
+
+        if count < 100:
+            p = self
+            return p.batch_multiply_unsafe(count, Jacobian_Points_dict, n_dict)
+        else:
+            cpu_num = os.cpu_count()
+            list_size = cpu_num * 10
+            self_list = []
+            count_list = []
+            Jacobian_Points_dict_list = []
+            n_dict_list = []
+            chunk_count = count // list_size # computes count / cpu_num and rounds down result to integer
+            chunk_remainder = count % list_size
+            # print('count                 : {}'.format(count))
+            # print('cpu_num               : {}'.format(cpu_num))
+            # print('chunk_count           : {}'.format(chunk_count))
+            # print('chunk_remainder       : {}'.format(chunk_remainder))
+            for i in range(list_size):
+                if i == list_size-1:
+                    self_list.insert(i, self)
+                else:
+                    self_list.insert(i, JacobianPoint.zero())
+
+                chunk_size = chunk_count
+                if i == list_size-1:
+                    chunk_size = chunk_count + chunk_remainder
+                count_list.insert(i, chunk_size)
+
+                chunk_points_dict = {}
+                chunk_n_dict = {}
+                for j in range(chunk_size):
+                    chunk_points_dict[j] = Jacobian_Points_dict[i * chunk_count + j]
+                    chunk_n_dict[j] = n_dict[i * chunk_count + j]
+                Jacobian_Points_dict_list.insert(i, chunk_points_dict)
+                n_dict_list.insert(i, chunk_n_dict)
+
+            # print('self_list                : {}'.format(self_list))
+            # print('count_list               : {}'.format(count_list))
+            # print('Jacobian_Points_dict_list: {}'.format(Jacobian_Points_dict_list))
+            # print('n_dict_list              : {}'.format(n_dict_list))
+            with concurrent.futures.ProcessPoolExecutor(max_workers = cpu_num, mp_context=mp.get_context('spawn'), max_tasks_per_child = list_size // cpu_num) as executor:
+                p_list = list(executor.map(batch_multiply_unsafe_objectless, 
+                    self_list,
+                    count_list, 
+                    Jacobian_Points_dict_list,
+                    n_dict_list
+                    ))
+            ret_val = JacobianPoint.zero()
+            for i in range(len(p_list)):
+                ret_val = ret_val.add(p_list[i])
+            return ret_val
+
+def batch_multiply_unsafe_objectless(my_object, count, Jacobian_Points_dict, n_dict) -> JacobianPoint:
+    return my_object.batch_multiply_unsafe(count, Jacobian_Points_dict, n_dict)
 
 class Point(object):
     def __init__(self, x, y):
@@ -197,7 +254,8 @@ class Point(object):
         Jacobian_Points_dict = {}
         for i in range(count):
             Jacobian_Points_dict[i] = JacobianPoint.from_affine(Points_dict[i])
-        return JacobianPoint.from_affine(self).batch_multiply_unsafe(count, Jacobian_Points_dict, scalars_dict).to_affine()
+        # return JacobianPoint.from_affine(self).batch_multiply_unsafe(count, Jacobian_Points_dict, scalars_dict).to_affine()
+        return JacobianPoint.from_affine(self).batch_multiply_parallel_unsafe(count, Jacobian_Points_dict, scalars_dict).to_affine()
 
 
 def mod(a, b=P):

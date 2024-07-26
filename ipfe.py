@@ -3,6 +3,7 @@
 # Our implementation of [ABDP15] Inner Product Functional Encryption.
 ############################################################
 
+import sys
 import time 
 import pickle
 import random
@@ -42,6 +43,12 @@ def ipfe_enc(ipfelen: int, mpk: dict, msg: dict) -> (bytes, dict):
 def ipfe_enc_dummy(ipfelen: int, mpk: dict, msg: dict) -> (bytes, dict):
     debug_print_vars(settings.DEBUG)
     return pke_encrypt_dummy(ipfelen, mpk, msg)
+
+## Assumes each co-ordinate of pubkey is same 
+## Assumes first ipfelen-1 co-ordinates of msg are same and last co-ordinate is zero.
+def ipfe_enc_dummy_with_last_zero(ipfelen: int, mpk: dict, msg: dict) -> (bytes, dict):
+    debug_print_vars(settings.DEBUG)
+    return pke_encrypt_dummy_with_last_zero(ipfelen, mpk, msg)
 
 def ipfe_kgen(ipfelen: int, msk: dict, f: dict) -> int:
     if len(msk) != ipfelen:
@@ -227,7 +234,7 @@ if __name__ == '__main__':
     settings.init()
 
     # len_range = (1, 2, 10)
-    len_range = (10 ** 2, 10 ** 3, 10 ** 4)
+    len_range = (10 ** 2, 10 ** 3, 10 ** 4, 10 ** 5)
     # bound_range = (100, 10000)
     msg_bound = 1000
     f_bound = 1000
@@ -246,7 +253,8 @@ if __name__ == '__main__':
     # dict_time = dict_et - dict_st
     # print('DictTime: {}'.format(dict_time))
 
-    DUMMY_SETUP_AND_ENC = False
+    DUMMY_SETUP_AND_ENC = True
+    # DUMMY_SETUP_AND_ENC = False
 
     if DUMMY_SETUP_AND_ENC:
         for ipfelen in len_range:
@@ -349,6 +357,10 @@ if __name__ == '__main__':
                 f[i] = f_i
                 actual_val = (actual_val + ((msg_i * f_i) %n)) % n
 
+            
+            print('ipfelen       : {}'.format(ipfelen))
+            print('sizeof msg_[0]: {}'.format(sys.getsizeof(msg[0])))
+            print('sizeof msg    : {}'.format(dict_kv_length(msg)))
 
             st = time.time()
 

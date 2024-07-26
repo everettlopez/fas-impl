@@ -155,6 +155,27 @@ def pke_encrypt_dummy(pkelen: int, pubkey: dict, msg: dict) -> (bytes, dict):
     debug_print_vars(settings.DEBUG)
     return (ct0, ct1)
 
+## Assumes each co-ordinate of pubkey is same 
+## Assumes first pkelen-1 co-ordinates of msg are same and last co-ordinate is zero.
+def pke_encrypt_dummy_with_last_zero(pkelen: int, pubkey: dict, msg: dict) -> (bytes, dict):
+    if len(pubkey) != pkelen:
+        raise ValueError('pke_encrypt: The public key must be list of length: {}'.format(pkelen))
+    if len(msg) != pkelen:
+        # maybe append with zeros instead of raising error?
+        raise ValueError('pke_encrypt: The message must be list of length: {}'.format(pkelen))
+
+    r = random.randint(1, n-1)
+    ct0 = bytes_from_point(point_mul(G, r))
+        
+    ct1 = {}
+    dummy_ct1 = pke_encrypt_helper(0, pubkey[0], msg[0], r)
+    for i in range(pkelen-1):
+        ct1[i] = dummy_ct1
+    ct1[pkelen-1] = pke_encrypt_helper(0, pubkey[pkelen-1], msg[pkelen-1], r)
+
+    debug_print_vars(settings.DEBUG)
+    return (ct0, ct1)
+
 
 def pke_encrypt_sequential(pkelen: int, pubkey: dict, msg: dict) -> (bytes, dict):
     if len(pubkey) != pkelen:
