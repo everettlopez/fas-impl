@@ -2,6 +2,8 @@
 #### Description:
 # Our implementation of Schnorr signatures. 
 # Follows bip-0340/reference.py.
+
+# Author: Nikhil Vanjani
 ############################################################
 
 from utils import *

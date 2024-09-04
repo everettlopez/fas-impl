@@ -1,3 +1,10 @@
+############################################################
+#### Description:
+# debuggin settings.
+
+# Author: Nikhil Vanjani
+############################################################
+
 # Set DEBUG to True to get a detailed debug output including
 # intermediate values during key generation, signing, and
 # verification. This is implemented via calls to the

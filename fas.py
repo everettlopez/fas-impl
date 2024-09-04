@@ -1,6 +1,8 @@
 ############################################################
 #### Description:
 # Our implementation of Functional Adaptor Signatures. 
+
+# Author: Nikhil Vanjani
 ############################################################
 
 import random

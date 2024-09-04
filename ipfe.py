@@ -1,6 +1,8 @@
 ############################################################
 #### Description:
 # Our implementation of [ABDP15] Inner Product Functional Encryption.
+
+# Author: Nikhil Vanjani
 ############################################################
 
 import sys

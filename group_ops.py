@@ -1,3 +1,9 @@
+############################################################
+#### Description:
+# Our implementation of group ops. 
+
+# Author: Nikhil Vanjani
+############################################################
 from typing import Tuple, Optional, Any
 from libnum import ecc
 import sys

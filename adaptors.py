@@ -1,6 +1,8 @@
 ############################################################
 #### Description:
 # Our implementation of Schnorr Adaptor Signatures. 
+
+# Author: Nikhil Vanjani
 ############################################################
 
 import random

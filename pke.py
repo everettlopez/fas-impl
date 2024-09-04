@@ -2,6 +2,8 @@
 #### Description:
 # Our implementation of El Gamal Public Key Encryption.
 # msg is encoded in the exponent while encrypting it. 
+
+# Author: Nikhil Vanjani
 ############################################################
 
 import time 

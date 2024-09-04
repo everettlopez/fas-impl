@@ -1,6 +1,8 @@
 ############################################################
 #### Description:
 # Utility functions: secp256k1 curve ops, debuggin utils.
+
+# Author: Nikhil Vanjani
 ############################################################
 
 from typing import Tuple, Optional, Any
