@@ -15,6 +15,7 @@ This project aims to simplify the previous version of this code to make learning
 ---
 
 ## Overview
+This project is an implementation into the area of functional adaptor signatures (FAS) 
 
 
 ## Installation

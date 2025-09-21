@@ -319,8 +319,8 @@ if __name__ == '__main__':
 	# print('faslen wit_bound f_bound TotalBound ExecTime AdGenTime AuxGenTime AuxVerifyTime FPreSignTime FPreVerifyTime AdaptTime VerifyTime FExtOffTime FExtOnTime')
 	# print('------ --------- ------- ---------- -------- --------- ---------- ------------- ------------ -------------- --------- ---------- ----------- ----------')
 
-	DUMMY_SETUP_AND_ENC = False
-	# DUMMY_SETUP_AND_ENC = True
+	# DUMMY_SETUP_AND_ENC = False
+	DUMMY_SETUP_AND_ENC = True
 	if DUMMY_SETUP_AND_ENC:
 		for faslen in len_range:
 			for wit_bound in wit_bound_range:
@@ -351,6 +351,12 @@ if __name__ == '__main__':
 					try:
 						adgen_st = time.time()
 						(advt, st) = fas_adgen_dummy(faslen, bStatement, witness)
+
+						print("Advertisement generated:")
+						print("  mpk:", advt.mpk)
+						print("  ct0:", advt.ct0)
+						print("  ct1:", advt.ct1)
+						
 						adgen_et = time.time()
 						adgen_time = adgen_et - adgen_st
 						# print('check3 adgen_time: {}'.format(adgen_time))
