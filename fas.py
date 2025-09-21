@@ -35,31 +35,59 @@ class seller_state:
 		self.msk = None
 		self.t = None 
 
+
 def fas_adgen(faslen: int, bStatement: dict, witness: dict) -> (advertisement, seller_state):
+	"""
+	The seller of the trade generates an advertisement advt using the FAS interface AdGen, that 
+	embeds the statement X and the corresponding secret witness x, where (X, x) is in the set R for some
+	NP relation R.
+
+	Args:
+		- faslen - expected length of the statement and witness vectors.
+		- bStatement - the statement X which is made public.
+		- witness - the secret witness x (private proof).
+
+	Returns:
+		- advertisement - a transparent and accessible mechanism for buyers.
+		- seller_state - internal secrets the seller keeps.
+
+	"""
+
+	################# INPUT VALIDATION #################	
 	if len(bStatement) != faslen:
 		raise ValueError('fas_adgen: The statement must be list of length: {}'.format(faslen))
 	if len(witness) != faslen:
 		raise ValueError('fas_adgen: The witness must be list of length: {}'.format(faslen))
-
+	
+	################# SETUP CRYPTOGRAPHY SCHEME #################
+	# Using the Inner-Product Functional Encryption to generate both:
+	#		- mpk (Master Public Key) to go into the advertisement
+	# 		- msk (Master Secret Key) to be kept by the seller
 	ipfelen = faslen + 1
-
 	(mpk, msk) = ipfe_setup(ipfelen)
 
+
+	################# SELLER RANDOMNESS #################
 	t = {}
 	for i in range(faslen):
 		t_i = random.randint(0, n-1)
 		t[i] = t_i
 
-	witness_tilde = witness.copy() 
-	witness_tilde[len(witness_tilde)] = 0
-	(ct0, ct1) = ipfe_enc(ipfelen, mpk, witness_tilde)
-	advt = advertisement()
-	advt.mpk = mpk
-	advt.ct0 = ct0
-	advt.ct1 = ct1
-	st = seller_state()
-	st.msk = msk
-	st.t = t
+	################# EXTEND WITNESS AND ENCRYPT IT #################
+	witness_tilde = witness.copy() 							
+	witness_tilde[len(witness_tilde)] = 0						# Pad the witness with 0's at the end
+	(ct0, ct1) = ipfe_enc(ipfelen, mpk, witness_tilde)			# Encrypt the padded witness, returns cryphertexts (ct0, ct1)
+
+	################# BUILD THE ADVERTISEMENT #################
+	advt = advertisement()	
+	advt.mpk = mpk				# Add the master public key 
+	advt.ct0 = ct0				# Add the first cyphertext (ct0)
+	advt.ct1 = ct1				# Add the second cyphertext (ct1)
+
+	################# BUILD SELLER STATE #################
+	st = seller_state()		
+	st.msk = msk				# Add the master secret key
+	st.t = t					# Add their random values
 
 	debug_print_vars(settings.DEBUG)
 	return (advt, st)
@@ -115,7 +143,20 @@ def fas_auxgen(faslen: int, advt: advertisement, st: seller_state, f: dict) -> (
 	debug_print_vars(settings.DEBUG)
 	return (aux_f, pi_f)
 
+
+
 def fas_auxverify(faslen: int, advt: advertisement, f: dict, aux_f: bytes, pi_f: int) -> bool:
+	"""
+	Public verification for the advertisement (advt) using the AdVerify algorithm.
+
+	Args:
+		- faslen - expected length of the statement and witness vectors
+		- advertisement - the advertisment with the mpk (master public key) and ciphertexts.
+		- f - a public function vector used in verification.
+		- aux_f - 
+	"""
+
+
 	if len(f) != faslen:
 		debug_print_vars(settings.DEBUG)
 		raise ValueError('fas_auxverify: The function must be list of length: {}'.format(faslen))
@@ -129,17 +170,69 @@ def fas_auxverify(faslen: int, advt: advertisement, f: dict, aux_f: bytes, pi_f:
 	debug_print_vars(settings.DEBUG)
 	return False
 
+
 def fas_fpresign(faslen: int, advt: advertisement, seckey: bytes, msg: bytes, bStatement: dict, f: dict, aux_f: bytes) -> bytes:
+	"""
+	A public algorithm to generate a pre-signature as bytes on the given message (msg) for the statement (bStatement) and a function (f).\
+	
+	Args:
+		- faslen - expected length of the statement and witness vectors.
+		- advt - created advertisment from AdGen.
+		- seckey - secret key represented as bytes.
+		- msg - the payment transaction (represented as tx in paper)
+		- bStatement - the statement X which was made public.
+		- f - a public function vector used in verification.
+		- aux_f - 
+
+	Returns: 
+		- Pre-Signature represented as bytes which will be used in later operations.
+	"""
+
 	aux_rand = bytes_from_int(random.randint(1, n-1))
 	debug_print_vars(settings.DEBUG)
-	return as_presign(msg, seckey, aux_rand, aux_f)
+	return as_presign(msg, seckey, aux_rand, aux_f) 		# Method is in Adaptors.py
 
 def fas_fpreverify(faslen: int, advt: advertisement, pubkey: bytes, msg: bytes, bStatement: dict, f: dict, aux_f: bytes, pi_f: int, presig: bytes) -> bool:
+	"""
+	A public algorithm to help the seller to verify if the pre-signature is valid with respect to the message m, statement, and function f.
+
+	Args: 
+		- faslen - expected length of the statement and witness vectors.
+		- advt - created advertisment from AdGen.
+		- pubkey - public key used for decryption
+		- msg - the payment transaction (represented as tx in paper)
+		- bStatement - the statement X which was made public.
+		- f - a public function vector used in verification.
+		- aux_f - 
+		- pi_f - 
+		- presign - 
+
+	Returns:
+		- boolean - determine if the given pre-signature is valid or not.
+	"""
 
 	debug_print_vars(settings.DEBUG)
 	return fas_auxverify(faslen, advt, f, aux_f, pi_f) and as_preverify(msg, pubkey, presig, aux_f)
 
+
+
 def fas_adapt(faslen: int, advt: advertisement, st: seller_state, pubkey: bytes, msg: bytes, bStatement: dict, witness: dict, f: dict, aux_f: bytes, presig: bytes) -> bytes:
+	"""
+	A public algorithm which allows the seller to use the witness to adapt the pre-signature into a full-signature on the message (msg).
+
+	Args: 
+		- faslen - expected length of the statement and witness vectors.
+		- advt - created advertisment from AdGen.
+		- st - the seller state which has access to the msk (master secret key) and random values.
+		- pubkey - the public key of the ...
+		- msg - the payment transaction (represented as tx in paper)
+		- bStatement - the statement X which was made public.
+		- witness - the secret witness x (private proof).
+		- f - 
+		- aux - 
+		- presign - 
+	"""
+
 	if len(f) != faslen:
 		raise ValueError('fas_auxgen: The function must be list of length: {}'.format(faslen))
 
@@ -189,11 +282,13 @@ def fas_fext_online(advt: advertisement, pubkey: bytes, presig: bytes, sig: byte
 if __name__ == '__main__':
 	settings.init()
 
+
 	len_range = []
-	# len_range.append(100000)
+	len_range.append(100000)
+
 	# len_range.append(1000000)
 	# len_range.append(10000000)
-	len_range.append(30000000)
+	# len_range.append(30000000)
 	# len_range = (1, 100, 10000)
 	# len_range = (20000, 30000, 40000, 50000)
 	# len_range = (60000, 70000, 80000, 90000, 100000)
@@ -206,12 +301,12 @@ if __name__ == '__main__':
 
 	# bound_range = (100, 10000)
 	
-	# f_bound_range = (100, 1000)
+	f_bound_range = (100, 1000)
 	# wit_bound_range = (100, 1000)
 	wit_bound_range = []
 	wit_bound_range.append(1000)
-	f_bound_range = []
-	f_bound_range.append(1000)
+	# f_bound_range = []
+	# f_bound_range.append(1000)
 
 	# msg_dict = {}
 	# dict_st = time.time()
@@ -221,11 +316,11 @@ if __name__ == '__main__':
 	# dict_time = dict_et - dict_st
 	# print('DictTime: {}'.format(dict_time))
 
-	print('faslen wit_bound f_bound TotalBound ExecTime AdGenTime AuxGenTime AuxVerifyTime FPreSignTime FPreVerifyTime AdaptTime VerifyTime FExtOffTime FExtOnTime')
-	print('------ --------- ------- ---------- -------- --------- ---------- ------------- ------------ -------------- --------- ---------- ----------- ----------')
+	# print('faslen wit_bound f_bound TotalBound ExecTime AdGenTime AuxGenTime AuxVerifyTime FPreSignTime FPreVerifyTime AdaptTime VerifyTime FExtOffTime FExtOnTime')
+	# print('------ --------- ------- ---------- -------- --------- ---------- ------------- ------------ -------------- --------- ---------- ----------- ----------')
 
-	# DUMMY_SETUP_AND_ENC = False
-	DUMMY_SETUP_AND_ENC = True
+	DUMMY_SETUP_AND_ENC = False
+	# DUMMY_SETUP_AND_ENC = True
 	if DUMMY_SETUP_AND_ENC:
 		for faslen in len_range:
 			for wit_bound in wit_bound_range:
@@ -381,6 +476,12 @@ if __name__ == '__main__':
 					try:
 						adgen_st = time.time()
 						(advt, st) = fas_adgen(faslen, bStatement, witness)
+
+						print("Advertisement generated:")
+						print("  mpk:", advt.mpk)
+						print("  ct0:", advt.ct0)
+						print("  ct1:", advt.ct1)
+						
 						adgen_et = time.time()
 						adgen_time = adgen_et - adgen_st
 						# print('check3 adgen_time: {}'.format(adgen_time))
